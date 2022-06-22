@@ -135,7 +135,7 @@ def update_observables(hive_api, site):
             print(str(timezone.now()) + " - " + "OK")
         else:
             print(str(timezone.now()) + " - " + 'ko: {}/{}'.format(response.status_code, response.text))
-
+            print(response.json()['type'])
             if response.json()['type'] == "NotFoundError":
                 # Reset the case id in database
                 Site.objects.filter(pk=site.pk).update(the_hive_case_id=None)
