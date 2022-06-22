@@ -139,7 +139,7 @@ def update_observables(hive_api, site):
             if response.json()['type'] == "AuthorizationError":
                 # Reset the case id in database
                 Site.objects.filter(pk=site.pk).update(the_hive_case_id=None)
-                raise NotFound("TheHive Case" + str(case_id) + " Not Found: Resetting")
+                raise NotFound("TheHive Case " + str(case_id) + " Not Found: Resetting")
 
     if site.ip_second and not search_observables(hive_api, case_id, site.ip_second):
         response = hive_api.create_case_observable(case_id, CaseObservable(dataType='ip',
@@ -157,7 +157,7 @@ def update_observables(hive_api, site):
             if response.json()['type'] == "AuthorizationError":
                 # Reset the case id in database
                 Site.objects.filter(pk=site.pk).update(the_hive_case_id=None)
-                raise NotFound("TheHive Case" + str(case_id) + " Not Found: Resetting")
+                raise NotFound("TheHive Case " + str(case_id) + " Not Found: Resetting")
 
     if site.mail_A_record_ip and not search_observables(hive_api, case_id, site.mail_A_record_ip):
         response = hive_api.create_case_observable(case_id, CaseObservable(dataType='ip',
@@ -175,7 +175,7 @@ def update_observables(hive_api, site):
             if response.json()['type'] == "AuthorizationError":
                 # Reset the case id in database
                 Site.objects.filter(pk=site.pk).update(the_hive_case_id=None)
-                raise NotFound("TheHive Case" + str(case_id) + " Not Found: Resetting")
+                raise NotFound("TheHive Case " + str(case_id) + " Not Found: Resetting")
 
     if site.MX_records:
         for mx in site.MX_records:
@@ -195,4 +195,4 @@ def update_observables(hive_api, site):
                     if response.json()['type'] == "AuthorizationError":
                         # Reset the case id in database
                         Site.objects.filter(pk=site.pk).update(the_hive_case_id=None)
-                        raise NotFound("TheHive Case" + str(case_id) + " Not Found: Resetting")
+                        raise NotFound("TheHive Case " + str(case_id) + " Not Found: Resetting")
