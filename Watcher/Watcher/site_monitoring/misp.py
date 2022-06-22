@@ -25,7 +25,6 @@ def create_misp_tags(misp_api):
     for tag in required_tags:
         t = MISPTag()
         t.name = tag
-        t.org_id = 1
         if tag not in tags_names:
             print(str(timezone.now()) + " - " + "Create tag: ", tag)
             misp_api.add_tag(t)
