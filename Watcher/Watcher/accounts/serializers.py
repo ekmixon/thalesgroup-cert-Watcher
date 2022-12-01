@@ -19,10 +19,9 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
     def validate(self, data):
-        user = authenticate(**data)
-        if user and user.is_active:
-            return user
-        if user and not user.is_active:
+        if user := authenticate(**data):
+            if user.is_active:
+                return user
             raise serializers.ValidationError("Account created but not active. Please contact the administrator.")
         raise serializers.ValidationError("Incorrect Credentials")
 

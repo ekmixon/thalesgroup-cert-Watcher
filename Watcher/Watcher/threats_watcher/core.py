@@ -39,11 +39,14 @@ def cleanup():
     Remove words with a creation date greater than 30 days.
     """
     close_old_connections()
-    print(str(timezone.now()) + " - CRON TASK : Remove words with a creation date greater than 30 days")
+    print(
+        f"{str(timezone.now())} - CRON TASK : Remove words with a creation date greater than 30 days"
+    )
+
     words = TrendyWord.objects.all()
     for word in words:
         if (timezone.now() - word.created_at) >= timedelta(days=30):
-            print(str(timezone.now()) + " - Delete this trendy word -> ", word.name)
+            print(f"{str(timezone.now())} - Delete this trendy word -> ", word.name)
             word.delete()
 
 
@@ -60,16 +63,16 @@ def main_watch():
         - send_email()
     """
     close_old_connections()
-    print(str(timezone.now()) + " - CRON TASK : Main function")
+    print(f"{str(timezone.now())} - CRON TASK : Main function")
     load_feeds()
-    print(str(timezone.now()) + " - Loaded feeds.")
+    print(f"{str(timezone.now())} - Loaded feeds.")
     fetch_last_posts(settings.POSTS_DEPTH)
-    print(str(timezone.now()) + " - Fetched last posts.")
+    print(f"{str(timezone.now())} - Fetched last posts.")
     tokenize_count_urls()
-    print(str(timezone.now()) + " - Tokenized words.")
+    print(f"{str(timezone.now())} - Tokenized words.")
     # print("POSTS Before Banned : ", posts_words)
     remove_banned_words()
-    print(str(timezone.now()) + " - Removed banned words.")
+    print(f"{str(timezone.now())} - Removed banned words.")
     # print("POSTS Without Banned Words : ", posts_without_banned)
 
     focus_five_letters()
@@ -84,10 +87,8 @@ def load_feeds():
     global rss_urls
     global feeds
     sources = Source.objects.all().order_by('id')
-    rss_urls = list()
     feeds = []
-    for source in sources:
-        rss_urls.append(source.url)
+    rss_urls = [source.url for source in sources]
     # print("RSS : ", rss_urls)
 
 
@@ -99,15 +100,15 @@ def fetch_last_posts(nb_max_post):
     """
     global posts
     global posts_published
-    posts = dict()
-    tmp_posts = dict()
-    posts_published = dict()
+    posts = {}
+    tmp_posts = {}
+    posts_published = {}
     for url in rss_urls:
         try:
             feed_content = requests.get(url)
             feeds.append(feedparser.parse(feed_content.text))
         except requests.exceptions.RequestException as e:
-            print(str(timezone.now()) + " - ", e)
+            print(f"{str(timezone.now())} - ", e)
     for feed in feeds:
         count = 1
         for post in feed.entries:
@@ -117,10 +118,9 @@ def fetch_last_posts(nb_max_post):
                     dt = datetime.fromtimestamp(calendar.timegm(post.published_parsed))
                 else:
                     dt = "no-date"
-                if 'link' in post:
-                    if 'title' in post:
-                        tmp_posts[str(post.title)] = post.link
-                        posts_published[str(post.link)] = dt
+                if 'link' in post and 'title' in post:
+                    tmp_posts[str(post.title)] = post.link
+                    posts_published[str(post.link)] = dt
 
     for title, url in tmp_posts.items():
         string = title.replace(u'\xa0', u' ')
@@ -134,18 +134,18 @@ def tokenize_count_urls():
     """
     global posts_words
     global wordurl
-    posts_words = dict()
-    wordurl = dict()
+    posts_words = {}
+    wordurl = {}
 
     for title, url in posts.items():
         word_tokens = word_tokenize(title)
         for word in word_tokens:
             if word in posts_words:
                 posts_words[word] += 1
-                wordurl[word + "_url"] = wordurl[word + "_url"] + ', ' + url
+                wordurl[f"{word}_url"] = f'{wordurl[f"{word}_url"]}, {url}'
             else:
                 posts_words[word] = 1
-                wordurl[word + "_url"] = url
+                wordurl[f"{word}_url"] = url
 
 
 def remove_banned_words():
@@ -155,7 +155,7 @@ def remove_banned_words():
     banned_words = BannedWord.objects.all().order_by('id')
     global posts_without_banned
 
-    posts_without_banned = dict()
+    posts_without_banned = {}
 
     french = open('threats_watcher/datas/french.txt', 'r')
     french = french.read().splitlines()
@@ -167,9 +167,9 @@ def remove_banned_words():
             if word1.name == word:
                 word = ""
         for word2 in english:
-            word = re.sub(r'^' + word2 + r'$', "", word)
+            word = re.sub(f'^{word2}$', "", word)
         for word3 in french:
-            word = re.sub(r'^' + word3 + r'$', "", word)
+            word = re.sub(f'^{word3}$', "", word)
         if word == "https":
             word = ""
 
@@ -179,10 +179,7 @@ def remove_banned_words():
         word = re.sub(r"^(\d+\.)?(\d+\.)?(\*|\d+)?(\.\d+)?(\.\d+)$" + r'$', '', word)
         # Remove ' (sometimes regular expression don't catch this character)
         word = word.replace("'", "")
-        # Remove '/' (sometimes regular expression don't catch this character)
-        word = word.replace("/", "")
-        
-        if word:
+        if word := word.replace("/", ""):
             posts_without_banned[word] = count
 
 
@@ -191,11 +188,12 @@ def focus_five_letters():
     Focus on 5 letters long words.
     """
     global posts_five_letters
-    posts_five_letters = dict()
     n = 4
-    for word, count in posts_without_banned.items():
-        if len(word) > n:
-            posts_five_letters[word] = count
+    posts_five_letters = {
+        word: count
+        for word, count in posts_without_banned.items()
+        if len(word) > n
+    }
 
 
 def focus_on_top(words_occurrence):
@@ -206,59 +204,62 @@ def focus_on_top(words_occurrence):
     :param words_occurrence: Word occurence in feeds.
     """
     global email_words
-    email_words = list()
-    new_posts = dict()
+    email_words = []
+    new_posts = {}
 
     for word, occurrences in posts_five_letters.items():
         if occurrences >= words_occurrence:
 
             # If word is already created, update occurences number
             if TrendyWord.objects.filter(name=word):
-                print(str(timezone.now()) + " - " + word + " : ", occurrences, " (in database)")
+                print(f"{str(timezone.now())} - {word} : ", occurrences, " (in database)")
                 try:
-                    for posturl in wordurl[word + "_url"].split(', '):
+                    for posturl in wordurl[f"{word}_url"].split(', '):
                         for url_, date in posts_published.items():
-                            if posturl == url_:
-                                # If word is in a new post
-                                if not PostUrl.objects.filter(url=posturl):
-                                    print(str(timezone.now()) + " - " + word, " appeared in a new post!")
-                                    # Increase occurences number of 1
-                                    TrendyWord.objects.filter(name=word).update(
-                                        occurrences=(TrendyWord.objects.get(name=word).occurrences + 1))
+                            if posturl == url_ and not PostUrl.objects.filter(
+                                url=posturl
+                            ):
+                                print(f"{str(timezone.now())} - {word}", " appeared in a new post!")
+                                # Increase occurences number of 1
+                                TrendyWord.objects.filter(name=word).update(
+                                    occurrences=(TrendyWord.objects.get(name=word).occurrences + 1))
 
-                                    if date != "no-date":
-                                        # Add new post
-                                        PostUrl.objects.create(url=posturl, created_at=date)
-                                    else:
-                                        PostUrl.objects.create(url=posturl)
+                                if date != "no-date":
+                                    # Add new post
+                                    PostUrl.objects.create(url=posturl, created_at=date)
+                                else:
+                                    PostUrl.objects.create(url=posturl)
 
-                                    # Link created word with new posts
-                                    TrendyWord.objects.get(name=word).posturls.add(PostUrl.objects.get(url=posturl))
-                                    new_posts[word] = new_posts.get(word, 0) + 1
+                                # Link created word with new posts
+                                TrendyWord.objects.get(name=word).posturls.add(PostUrl.objects.get(url=posturl))
+                                new_posts[word] = new_posts.get(word, 0) + 1
                 except KeyError:
                     pass
             else:
-                print(str(timezone.now()) + " - " + word + " : ", occurrences)
+                print(f"{str(timezone.now())} - {word} : ", occurrences)
                 # Add urls in DB
                 try:
-                    for url in wordurl[word + "_url"].split(', '):
+                    for url in wordurl[f"{word}_url"].split(', '):
                         for url_, date in posts_published.items():
-                            if url == url_:
-                                if not PostUrl.objects.filter(url=url):
-                                    if date != "no-date":
-                                        # Add new post
-                                        PostUrl.objects.create(url=url, created_at=date)
-                                    else:
-                                        PostUrl.objects.create(url=url)
+                            if url == url_ and not PostUrl.objects.filter(
+                                url=url
+                            ):
+                                if date != "no-date":
+                                    # Add new post
+                                    PostUrl.objects.create(url=url, created_at=date)
+                                else:
+                                    PostUrl.objects.create(url=url)
 
                     word_db = TrendyWord.objects.create(name=word, occurrences=occurrences)
 
                     # Link created words with new posts
-                    for url in wordurl[word + "_url"].split(', '):
+                    for url in wordurl[f"{word}_url"].split(', '):
                         word_db.posturls.add(PostUrl.objects.get(url=url))
 
                     email_words.append(
-                        "<a href=" + settings.WATCHER_URL + ">" + word + "</a> :<b> " + str(occurrences) + "</b>")
+                        f"<a href={settings.WATCHER_URL}>{word}</a> :<b> {str(occurrences)}</b>"
+                    )
+
                 except KeyError:
                     pass
 
@@ -267,14 +268,11 @@ def send_email():
     """
     Send e-mail alert.
     """
-    emails_to = list()
     if len(email_words) > 0:
-        # Get all subscribers email
-        for subscriber in Subscriber.objects.all():
-            emails_to.append(subscriber.user_rec.email)
-
-        # If there is at least one subscriber
-        if len(emails_to) > 0:
+        if emails_to := [
+            subscriber.user_rec.email
+            for subscriber in Subscriber.objects.all()
+        ]:
             try:
                 msg = MIMEMultipart()
                 msg['From'] = settings.EMAIL_FROM
@@ -289,11 +287,11 @@ def send_email():
 
             except Exception as e:
                 # Print any error messages to stdout
-                print(str(timezone.now()) + " - Email Error : ", e)
+                print(f"{str(timezone.now())} - Email Error : ", e)
             finally:
                 for email in emails_to:
-                    print(str(timezone.now()) + " - Email sent to ", email)
+                    print(f"{str(timezone.now())} - Email sent to ", email)
         else:
-            print(str(timezone.now()) + " - No subscriber, no email sent.")
+            print(f"{str(timezone.now())} - No subscriber, no email sent.")
     else:
-        print(str(timezone.now()) + " - No new word detected, no email sent.")
+        print(f"{str(timezone.now())} - No new word detected, no email sent.")

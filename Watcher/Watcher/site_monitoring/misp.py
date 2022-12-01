@@ -13,20 +13,18 @@ def create_misp_tags(misp_api):
     :return: Tags created.
     :rtype: list
     """
-    print(str(timezone.now()) + " - " + 'Generate MISP Tags')
+    print(f"{str(timezone.now())} - Generate MISP Tags")
     print('-----------------------------')
 
     required_tags = settings.MISP_TAGS
-    tag_list = list()
+    tag_list = []
     tags = misp_api.tags(pythonify=True)
-    tags_names = list()
-    for tag in tags:
-        tags_names.append(tag.name)
+    tags_names = [tag.name for tag in tags]
     for tag in required_tags:
         t = MISPTag()
         t.name = tag
         if tag not in tags_names:
-            print(str(timezone.now()) + " - " + "Create tag: ", tag)
+            print(f"{str(timezone.now())} - Create tag: ", tag)
             misp_api.add_tag(t)
         tag_list.append(t)
 
@@ -42,7 +40,7 @@ def create_attributes(misp_api, event_id, site):
     :param site: Site Object.
     :return:
     """
-    print(str(timezone.now()) + " - " + 'Create MISP IOCs attributes for: ', event_id)
+    print(f"{str(timezone.now())} - Create MISP IOCs attributes for: ", event_id)
     print('-----------------------------')
 
     attribute = MISPAttribute()
@@ -59,7 +57,7 @@ def create_attributes(misp_api, event_id, site):
         attribute.type = "link"
         attribute.distribution = 0
         attribute.comment = "Ticketing link"
-        attribute.value = settings.MISP_TICKETING_URL + "?id=" + str(site.rtir)
+        attribute.value = f"{settings.MISP_TICKETING_URL}?id={str(site.rtir)}"
         misp_api.add_attribute(event=event_id, attribute=attribute)
 
     if site.ip:
@@ -85,7 +83,7 @@ def create_attributes(misp_api, event_id, site):
         attribute.category = "Network activity"
         attribute.type = "ip-dst"
         attribute.distribution = 5
-        attribute.comment = 'Mail Server A record IP: mail.' + site.domain_name
+        attribute.comment = f'Mail Server A record IP: mail.{site.domain_name}'
         attribute.value = site.mail_A_record_ip
         misp_api.add_attribute(event=event_id, attribute=attribute)
 
@@ -117,18 +115,14 @@ def search_attributes(misp_api, event_id, attribute_value, site_id):
         event_core = event_json["Event"]
     else:
         Site.objects.filter(pk=site_id).update(misp_event_id=None)
-        raise NotFound("MISP Event " + str(event_id) + " Not Found: Resetting")
+        raise NotFound(f"MISP Event {str(event_id)} Not Found: Resetting")
 
     if 'Attribute' in event_core:
         attributes = event_core["Attribute"]
     else:
         raise NotFound("Attributes Not Found")
 
-    r = False
-    for attribute in attributes:
-        if attribute['value'] == attribute_value:
-            r = True
-    return r
+    return any(attribute['value'] == attribute_value for attribute in attributes)
 
 
 def update_attributes(misp_api, site):
@@ -139,7 +133,11 @@ def update_attributes(misp_api, site):
     :param site: Site Object.
     :return:
     """
-    print(str(timezone.now()) + " - " + 'Update MISP IOCs attributes for: ', site.misp_event_id)
+    print(
+        f"{str(timezone.now())} - Update MISP IOCs attributes for: ",
+        site.misp_event_id,
+    )
+
     print('-----------------------------')
 
     if site.ip and not search_attributes(misp_api, site.misp_event_id, site.ip, site.pk):
@@ -165,7 +163,7 @@ def update_attributes(misp_api, site):
         attribute.category = "Network activity"
         attribute.type = "ip-dst"
         attribute.distribution = 5
-        attribute.comment = 'Mail Server A record IP: mail.' + site.domain_name
+        attribute.comment = f'Mail Server A record IP: mail.{site.domain_name}'
         attribute.value = site.mail_A_record_ip
         misp_api.add_attribute(event=site.misp_event_id, attribute=attribute)
 

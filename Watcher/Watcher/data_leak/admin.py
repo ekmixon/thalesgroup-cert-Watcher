@@ -42,8 +42,8 @@ class Alert(ExportMixin, admin.ModelAdmin):
         if rows_updated == 1:
             message_bit = "1 alert was"
         else:
-            message_bit = "%s alerts were" % rows_updated
-        self.message_user(request, "%s successfully marked as disable." % message_bit)
+            message_bit = f"{rows_updated} alerts were"
+        self.message_user(request, f"{message_bit} successfully marked as disable.")
 
     make_disable.short_description = "Disable selected alerts"
 
@@ -53,8 +53,8 @@ class Alert(ExportMixin, admin.ModelAdmin):
         if rows_updated == 1:
             message_bit = "1 alert was"
         else:
-            message_bit = "%s alerts were" % rows_updated
-        self.message_user(request, "%s successfully marked as enable." % message_bit)
+            message_bit = f"{rows_updated} alerts were"
+        self.message_user(request, f"{message_bit} successfully marked as enable.")
 
     make_enable.short_description = "Enable selected alerts"
 

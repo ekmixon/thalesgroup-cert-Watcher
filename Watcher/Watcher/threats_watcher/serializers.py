@@ -8,7 +8,7 @@ class TrackListingField(serializers.RelatedField, ABC):
     queryset = PostUrl.objects.all()
 
     def to_representation(self, value):
-        return '%s,%s' % (value.url, value.created_at)
+        return f'{value.url},{value.created_at}'
 
 
 # TrendyWord Serializer

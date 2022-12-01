@@ -33,10 +33,10 @@ while True:
             result = cursor.fetchone()
 
             if result and len(result) > 0:
-                print(db + " is up, starting Watcher.")
+                print(f"{db} is up, starting Watcher.")
                 break
             else:
-                print("Waiting for " + db + " ...")
+                print(f"Waiting for {db} ...")
                 time.sleep(1)
             cursor.close()
 

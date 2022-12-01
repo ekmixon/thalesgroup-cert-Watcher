@@ -21,8 +21,8 @@ import shadow_useragent
 try:
     shadow_useragent = shadow_useragent.ShadowUserAgent()
 except Exception as e:
-    print(str(timezone.now()) + " - ", e)
-    print(str(timezone.now()) + " - ", "Using default User-Agent")
+    print(f"{str(timezone.now())} - ", e)
+    print(f"{str(timezone.now())} - ", "Using default User-Agent")
     shadow_useragent = False
 
 
@@ -49,7 +49,7 @@ def monitoring_init(site):
     """
     if site.expiry is None or (site.expiry - timezone.now()) > timedelta(days=0):
         alert = 0
-        print(str(timezone.now()) + " - " + "Init Monitoring: ", site.domain_name)
+        print(f"{str(timezone.now())} - Init Monitoring: ", site.domain_name)
         check_content(site, alert, shadow_useragent)
 
         if Site.objects.get(pk=site.pk).web_status is not None:
@@ -67,7 +67,7 @@ def monitoring_check():
 
     """
     close_old_connections()
-    print(str(timezone.now()) + " - CRON TASK : Suspicious Website Monitoring")
+    print(f"{str(timezone.now())} - CRON TASK : Suspicious Website Monitoring")
 
     sites = Site.objects.all()
 
@@ -78,7 +78,7 @@ def monitoring_check():
 
         if site.expiry is None or (site.expiry - timezone.now()) > timedelta(days=0):
 
-            print(str(timezone.now()) + " - " + "Monitoring: ", site.domain_name)
+            print(f"{str(timezone.now())} - Monitoring: ", site.domain_name)
 
             result = check_content(site, alert, shadow_useragent)
             alert = result[0]
@@ -125,7 +125,10 @@ def check_content(site, alert, ua):
 
     score = 0
     try:
-        response = requests.get("https://" + site.domain_name, headers=headers, timeout=10)
+        response = requests.get(
+            f"https://{site.domain_name}", headers=headers, timeout=10
+        )
+
         if response.status_code == 200:
             Site.objects.filter(pk=site.pk).update(web_status=200)
             if site.content_monitoring:
@@ -137,11 +140,14 @@ def check_content(site, alert, ua):
                     fuzzy_hash = tlsh.hash(bytes(response.text, 'utf-8'))
                     Site.objects.filter(pk=site.pk).update(content_fuzzy_hash=fuzzy_hash, web_status=200)
         else:
-            print(str(timezone.now()) + " - " + "Status code: ", str(response.status_code))
+            print(f"{str(timezone.now())} - Status code: ", response.status_code)
             Site.objects.filter(pk=site.pk).update(web_status=response.status_code)
     except requests.exceptions.RequestException:
         try:
-            response = requests.get("http://" + site.domain_name, headers=headers, timeout=10)
+            response = requests.get(
+                f"http://{site.domain_name}", headers=headers, timeout=10
+            )
+
             if response.status_code == 200:
                 Site.objects.filter(pk=site.pk).update(web_status=200)
                 if site.content_monitoring:
@@ -153,11 +159,11 @@ def check_content(site, alert, ua):
                         fuzzy_hash = tlsh.hash(bytes(response.text, 'utf-8'))
                         Site.objects.filter(pk=site.pk).update(content_fuzzy_hash=fuzzy_hash, web_status=200)
             else:
-                print(str(timezone.now()) + " - " + "Status code: ", str(response.status_code))
+                print(f"{str(timezone.now())} - Status code: ", response.status_code)
                 Site.objects.filter(pk=site.pk).update(web_status=response.status_code)
         except requests.exceptions.RequestException:
             Site.objects.filter(pk=site.pk).update(web_status=None)
-            print(str(timezone.now()) + " - ", site.domain_name, " is unreachable.")
+            print(f"{str(timezone.now())} - ", site.domain_name, " is unreachable.")
 
     return alert, score
 
@@ -199,14 +205,25 @@ def check_ip(site, alert):
 
         if site.ip_monitoring:
             # Check if the first ip is in the same subnet
-            if len(addrs) >= 1 and (site.ip and ipaddress.ip_address(addrs[0][4][0]) not in ipaddress.ip_network(
-                    site.ip + "/16", strict=False)) or site.ip is None:
+            if (
+                len(addrs) >= 1
+                and site.ip
+                and ipaddress.ip_address(addrs[0][4][0])
+                not in ipaddress.ip_network(f"{site.ip}/16", strict=False)
+                or site.ip is None
+            ):
                 alert += 1
 
             if len(addrs) >= 2:
                 # Check if the second ip is in the same subnet
-                if (site.ip_second and ipaddress.ip_address(addrs[1][4][0]) not in ipaddress.ip_network(
-                        site.ip_second + "/16", strict=False)) or site.ip_second is None:
+                if (
+                    site.ip_second
+                    and ipaddress.ip_address(addrs[1][4][0])
+                    not in ipaddress.ip_network(
+                        f"{site.ip_second}/16", strict=False
+                    )
+                    or site.ip_second is None
+                ):
                     alert += 2
             elif site.ip_second:
                 alert += 2
@@ -214,8 +231,14 @@ def check_ip(site, alert):
                 Site.objects.filter(pk=site.pk).update(ip_second=new_ip_second)
 
             if len(addrs) == 3:
-                print(str(timezone.now()) + " - ", "Found third ip (", addrs[2][4][0], ") for => ",
-                      str(site.domain_name))
+                print(
+                    f"{str(timezone.now())} - ",
+                    "Found third ip (",
+                    addrs[2][4][0],
+                    ") for => ",
+                    site.domain_name,
+                )
+
 
         # Even if the new first/second ip are in the same subnet we change it in database
         if len(addrs) >= 1:
@@ -250,18 +273,14 @@ def check_mail(site, alert):
     resolv.lifetime = 5
 
     try:
-        mx_records_list = list()
         mx_records = resolv.resolve(site.domain_name, 'MX')
-        for record in mx_records:
-            mx_records_list.append(str(record))
+        mx_records_list = [str(record) for record in mx_records]
         mx_records_list.sort()
         if site.MX_records is None:
             alert_mx = True
             Site.objects.filter(pk=site.pk).update(MX_records=mx_records_list)
         else:
-            is_mx = False
-            if mx_records_list != site.MX_records:
-                is_mx = True
+            is_mx = mx_records_list != site.MX_records
             if is_mx:
                 alert_mx = True
                 Site.objects.filter(pk=site.pk).update(MX_records=mx_records_list)
@@ -271,9 +290,12 @@ def check_mail(site, alert):
             alert_mx = True
 
     try:
-        mail_ip = str(resolv.resolve('mail.' + site.domain_name, 'A')[0])
-        if site.mail_A_record_ip is None or ipaddress.ip_address(mail_ip) not in ipaddress.ip_network(
-                site.mail_A_record_ip + "/16", strict=False):
+        mail_ip = str(resolv.resolve(f'mail.{site.domain_name}', 'A')[0])
+        if site.mail_A_record_ip is None or ipaddress.ip_address(
+            mail_ip
+        ) not in ipaddress.ip_network(
+            f"{site.mail_A_record_ip}/16", strict=False
+        ):
             alert_a_ip = True
         Site.objects.filter(pk=site.pk).update(mail_A_record_ip=mail_ip)
     except(resolver.NoAnswer, resolver.NXDOMAIN, resolver.NoNameservers, DNSException):
@@ -298,16 +320,12 @@ def previous_alert(site, alert_type, alert_pk):
     :rtype: bool
     """
     alerts = Alert.objects.filter(site=site.pk, type=alert_type)
-    alert = None
-    is_previous = False
-
-    if len(alerts) > 0:
-        alert = alerts[0]
-
-    if alert is not None and ((timezone.now() - alert.created_at) < timedelta(hours=1)) and alert.pk != alert_pk:
-        is_previous = True
-
-    return is_previous
+    alert = alerts[0] if len(alerts) > 0 else None
+    return (
+        alert is not None
+        and (timezone.now() - alert.created_at) < timedelta(hours=1)
+        and alert.pk != alert_pk
+    )
 
 
 def create_alert(alert, site, new_ip, new_ip_second, score):

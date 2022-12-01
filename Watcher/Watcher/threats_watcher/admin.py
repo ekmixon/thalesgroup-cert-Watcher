@@ -61,8 +61,10 @@ class TrendyWordAdmin(ExportMixin, admin.ModelAdmin):
         if rows_updated == 1:
             message_bit = "1 trendy word was"
         else:
-            message_bit = "%s trendy words were" % rows_updated
-        self.message_user(request, "%s successfully Deleted & Blocklisted." % message_bit)
+            message_bit = f"{rows_updated} trendy words were"
+        self.message_user(
+            request, f"{message_bit} successfully Deleted & Blocklisted."
+        )
 
     make_delete_blocklist.short_description = "Delete & Blocklist selected trendy words"
 

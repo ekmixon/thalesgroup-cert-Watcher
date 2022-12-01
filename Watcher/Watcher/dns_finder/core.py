@@ -39,11 +39,10 @@ def in_dns_monitored(domain):
     :param domain: Domain to search (Str).
     :rtype: bool
     """
-    is_in = False
-    for dns_monitored in DnsMonitored.objects.all():
-        if dns_monitored.domain_name in domain:
-            is_in = True
-    return is_in
+    return any(
+        dns_monitored.domain_name in domain
+        for dns_monitored in DnsMonitored.objects.all()
+    )
 
 
 def print_callback(message, context):
@@ -57,7 +56,13 @@ def print_callback(message, context):
     for keyword_monitored in KeywordMonitored.objects.all():
         if keyword_monitored.name in domain and not DnsTwisted.objects.filter(domain_name=domain) and \
                 not in_dns_monitored(domain):
-            print(str(timezone.now()) + " - " + "Keyword", keyword_monitored.name, "detected in :", domain)
+            print(
+                f"{str(timezone.now())} - Keyword",
+                keyword_monitored.name,
+                "detected in :",
+                domain,
+            )
+
             dns_twisted = DnsTwisted.objects.create(domain_name=domain, keyword_monitored=keyword_monitored)
             alert = Alert.objects.create(dns_twisted=dns_twisted)
             send_email_cert_transparency(alert)
@@ -85,23 +90,33 @@ def check_dnstwist(dns_monitored):
     :param dns_monitored: DnsMonitored Object.
     :return:
     """
-    print(str(timezone.now()) + " - " + 'Runs dnstwist for: ', dns_monitored.domain_name)
+    print(
+        f"{str(timezone.now())} - Runs dnstwist for: ",
+        dns_monitored.domain_name,
+    )
+
     print('-----------------------------')
-    alerts_list = list()
+    alerts_list = []
     filepath_out = "./dns_finder/data/list.json"
     filepath_tlds = "./dns_finder/data/abused_tlds.dict"
 
     if os.path.exists(filepath_out):
         os.remove(filepath_out)
 
-    subprocess.check_output(map(six.text_type, [
-        'dnstwist',
-        '--registered',
-        '--format={}'.format("json"),
-        '--output={}'.format(filepath_out),
-        '--tld={}'.format(filepath_tlds),
-        '{}'.format(dns_monitored.domain_name),
-    ]))
+    subprocess.check_output(
+        map(
+            six.text_type,
+            [
+                'dnstwist',
+                '--registered',
+                '--format=json',
+                f'--output={filepath_out}',
+                f'--tld={filepath_tlds}',
+                f'{dns_monitored.domain_name}',
+            ],
+        )
+    )
+
 
     with open('dns_finder/data/list.json') as json_file:
         try:
@@ -111,28 +126,36 @@ def check_dnstwist(dns_monitored):
                 dns_a = False
                 dns_aaaa = False
                 dns_mx = False
-                if 'dns_a' in twisted_website_dict:
-                    if twisted_website_dict['dns_a'] != ['!ServFail']:
-                        dns_a = True
-                if 'dns_aaaa' in twisted_website_dict:
-                    if twisted_website_dict['dns_aaaa'] != ['!ServFail']:
-                        dns_aaaa = True
-                if 'dns_mx' in twisted_website_dict:
-                    if twisted_website_dict['dns_mx'] != ['!ServFail']:
-                        dns_mx = True
-                if 'dns_ns' in twisted_website_dict:
-                    if twisted_website_dict['dns_ns'] != ['!ServFail']:
-                        dns_ns = True
+                if 'dns_a' in twisted_website_dict and twisted_website_dict[
+                    'dns_a'
+                ] != ['!ServFail']:
+                    dns_a = True
+                if 'dns_aaaa' in twisted_website_dict and twisted_website_dict[
+                    'dns_aaaa'
+                ] != ['!ServFail']:
+                    dns_aaaa = True
+                if 'dns_mx' in twisted_website_dict and twisted_website_dict[
+                    'dns_mx'
+                ] != ['!ServFail']:
+                    dns_mx = True
+                if 'dns_ns' in twisted_website_dict and twisted_website_dict[
+                    'dns_ns'
+                ] != ['!ServFail']:
+                    dns_ns = True
                 # Check if there is at least one DNS entry
-                if dns_ns or dns_a or dns_aaaa or dns_mx:
-                    if twisted_website_dict['domain'] != dns_monitored.domain_name:
-                        # If it is a new domain name, we create it
-                        if not DnsTwisted.objects.filter(domain_name=twisted_website_dict['domain']):
-                            dns_twisted = DnsTwisted.objects.create(domain_name=twisted_website_dict['domain'],
-                                                                    dns_monitored=dns_monitored,
-                                                                    fuzzer=twisted_website_dict['fuzzer'])
-                            alert = Alert.objects.create(dns_twisted=dns_twisted)
-                            alerts_list.append(alert)
+                if (
+                    (dns_ns or dns_a or dns_aaaa or dns_mx)
+                    and twisted_website_dict['domain']
+                    != dns_monitored.domain_name
+                    and not DnsTwisted.objects.filter(
+                        domain_name=twisted_website_dict['domain']
+                    )
+                ):
+                    dns_twisted = DnsTwisted.objects.create(domain_name=twisted_website_dict['domain'],
+                                                            dns_monitored=dns_monitored,
+                                                            fuzzer=twisted_website_dict['fuzzer'])
+                    alert = Alert.objects.create(dns_twisted=dns_twisted)
+                    alerts_list.append(alert)
             # Send email alerts
             if len(alerts_list) < 6:
                 for alert in alerts_list:
@@ -142,7 +165,10 @@ def check_dnstwist(dns_monitored):
         except ValueError:
             print('Decoding JSON has failed')
 
-    print(str(timezone.now()) + " - " + "dnstwist: Successfully processed: ", dns_monitored.domain_name)
+    print(
+        f"{str(timezone.now())} - dnstwist: Successfully processed: ",
+        dns_monitored.domain_name,
+    )
 
 
 def send_email(alert):
@@ -151,18 +177,14 @@ def send_email(alert):
 
     :param alert: Alert Object.
     """
-    emails_to = list()
-    # Get all subscribers email
-    for subscriber in Subscriber.objects.all():
-        emails_to.append(subscriber.user_rec.email)
-
-    # If there is at least one subscriber
-    if len(emails_to) > 0:
+    if emails_to := [
+        subscriber.user_rec.email for subscriber in Subscriber.objects.all()
+    ]:
         try:
             msg = MIMEMultipart()
             msg['From'] = settings.EMAIL_FROM
             msg['To'] = ','.join(emails_to)
-            msg['Subject'] = str("[ALERT #" + str(alert.pk) + "] DNS Finder")
+            msg['Subject'] = str(f"[ALERT #{str(alert.pk)}] DNS Finder")
             body = get_template(alert)
             msg.attach(MIMEText(body, 'html', _charset='utf-8'))
             text = msg.as_string()
@@ -172,12 +194,12 @@ def send_email(alert):
 
         except Exception as e:
             # Print any error messages to stdout
-            print(str(timezone.now()) + " - Email Error : ", e)
+            print(f"{str(timezone.now())} - Email Error : ", e)
         finally:
             for email in emails_to:
-                print(str(timezone.now()) + " - Email sent to ", email)
+                print(f"{str(timezone.now())} - Email sent to ", email)
     else:
-        print(str(timezone.now()) + " - No subscriber, no email sent.")
+        print(f"{str(timezone.now())} - No subscriber, no email sent.")
 
 
 def send_group_email(dns_monitored, alerts_number):
@@ -187,18 +209,14 @@ def send_group_email(dns_monitored, alerts_number):
     :param dns_monitored: DnsMonitored Object.
     :param alerts_number: Number of alerts.
     """
-    emails_to = list()
-    # Get all subscribers email
-    for subscriber in Subscriber.objects.all():
-        emails_to.append(subscriber.user_rec.email)
-
-    # If there is at least one subscriber
-    if len(emails_to) > 0:
+    if emails_to := [
+        subscriber.user_rec.email for subscriber in Subscriber.objects.all()
+    ]:
         try:
             msg = MIMEMultipart()
             msg['From'] = settings.EMAIL_FROM
             msg['To'] = ','.join(emails_to)
-            msg['Subject'] = str("[" + str(alerts_number) + " ALERTS] DNS Finder")
+            msg['Subject'] = str(f"[{str(alerts_number)} ALERTS] DNS Finder")
             body = get_group_template(dns_monitored, alerts_number)
             msg.attach(MIMEText(body, 'html', _charset='utf-8'))
             text = msg.as_string()
@@ -208,12 +226,12 @@ def send_group_email(dns_monitored, alerts_number):
 
         except Exception as e:
             # Print any error messages to stdout
-            print(str(timezone.now()) + " - Email Error : ", e)
+            print(f"{str(timezone.now())} - Email Error : ", e)
         finally:
             for email in emails_to:
-                print(str(timezone.now()) + " - Email sent to ", email)
+                print(f"{str(timezone.now())} - Email sent to ", email)
     else:
-        print(str(timezone.now()) + " - No subscriber, no email sent.")
+        print(f"{str(timezone.now())} - No subscriber, no email sent.")
 
 
 def send_email_cert_transparency(alert):
@@ -222,18 +240,14 @@ def send_email_cert_transparency(alert):
 
     :param alert: Alert Object.
     """
-    emails_to = list()
-    # Get all subscribers email
-    for subscriber in Subscriber.objects.all():
-        emails_to.append(subscriber.user_rec.email)
-
-    # If there is at least one subscriber
-    if len(emails_to) > 0:
+    if emails_to := [
+        subscriber.user_rec.email for subscriber in Subscriber.objects.all()
+    ]:
         try:
             msg = MIMEMultipart()
             msg['From'] = settings.EMAIL_FROM
             msg['To'] = ','.join(emails_to)
-            msg['Subject'] = str("[ALERT #" + str(alert.pk) + "] DNS Finder")
+            msg['Subject'] = str(f"[ALERT #{str(alert.pk)}] DNS Finder")
             body = get_cert_transparency_template(alert)
             msg.attach(MIMEText(body, 'html', _charset='utf-8'))
             text = msg.as_string()
@@ -243,9 +257,9 @@ def send_email_cert_transparency(alert):
 
         except Exception as e:
             # Print any error messages to stdout
-            print(str(timezone.now()) + " - Email Error : ", e)
+            print(f"{str(timezone.now())} - Email Error : ", e)
         finally:
             for email in emails_to:
-                print(str(timezone.now()) + " - Email sent to ", email)
+                print(f"{str(timezone.now())} - Email sent to ", email)
     else:
-        print(str(timezone.now()) + " - No subscriber, no email sent.")
+        print(f"{str(timezone.now())} - No subscriber, no email sent.")

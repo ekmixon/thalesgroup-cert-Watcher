@@ -35,7 +35,7 @@ def cleanup():
     Remove 2 hours old, useless, pasteIDs.
     """
     close_old_connections()
-    print(str(timezone.now()) + " - CRON TASK : Remove 2 hours old pasteIDs.")
+    print(f"{str(timezone.now())} - CRON TASK : Remove 2 hours old pasteIDs.")
     count = 0
 
     paste_ids = PasteId.objects.all()
@@ -45,7 +45,7 @@ def cleanup():
         if (timezone.now() - paste_id.created_at) >= timedelta(hours=2):
             count += 1
             paste_id.delete()
-    print(str(timezone.now()) + " - Deleted ", count, " useless pasties ID.")
+    print(f"{str(timezone.now())} - Deleted ", count, " useless pasties ID.")
 
 
 def main_data_leak():
@@ -56,7 +56,7 @@ def main_data_leak():
             - check_keywords(keywords)
     """
     close_old_connections()
-    print(str(timezone.now()) + " - CRON TASK : Fetch searx & pastebin")
+    print(f"{str(timezone.now())} - CRON TASK : Fetch searx & pastebin")
     # read in our list of keywords
     keywords = Keyword.objects.all().order_by(Length('name').desc())
 
@@ -73,17 +73,14 @@ def check_urls(keyword, urls):
     :rtype: list
     """
     new_urls = []
-    stored_urls = list()
-
     if Alert.objects.all():
 
-        for alerts in Alert.objects.all():
-            stored_urls.append(alerts.url)
+        stored_urls = [alerts.url for alerts in Alert.objects.all()]
 
         for url in urls:
 
             if url not in stored_urls:
-                print(str(timezone.now()) + " - New URL for", keyword, " discovered: ", url)
+                print(f"{str(timezone.now())} - New URL for", keyword, " discovered: ", url)
 
                 new_urls.append(url)
     else:
@@ -108,13 +105,13 @@ def check_searx(keyword):
     params = {'q': keyword, 'engines': 'gitlab,github,bitbucket,apkmirror,gentoo,npm,stackoverflow,hoogle',
               'format': 'json'}
 
-    print(str(timezone.now()) + " - Querying Searx for: ", keyword)
+    print(f"{str(timezone.now())} - Querying Searx for: ", keyword)
 
     # send the request off to searx
     try:
         response = requests.get(settings.DATA_LEAK_SEARX_URL, params=params)
     except requests.exceptions.RequestException as e:
-        print(str(timezone.now()) + " - ", e)
+        print(f"{str(timezone.now())} - ", e)
         return hits
 
     try:
@@ -130,7 +127,7 @@ def check_searx(keyword):
             hits = check_urls(keyword, urls)
     except JSONDecodeError as e:
         # no JSON returned
-        print(str(timezone.now()) + " - ", e)
+        print(f"{str(timezone.now())} - ", e)
         return hits
 
     return hits
@@ -146,15 +143,13 @@ def check_pastebin(keywords):
     """
     global paste_content_hits
     paste_content_hits = {}
-    new_ids = []
-    pastebin_ids = list()
     paste_hits = {}
 
     # Fetch the Pastebin API
     try:
         response = requests.get("https://scrape.pastebin.com/api_scraping.php?limit=250")
     except requests.exceptions.RequestException as e:
-        print(str(timezone.now()) + " - ", e)
+        print(f"{str(timezone.now())} - ", e)
         return paste_hits
 
     if len(response.text) > 0:
@@ -165,9 +160,8 @@ def check_pastebin(keywords):
 
             # load up our list of stored paste ID's and only check the new ones
             pastebin = PasteId.objects.all()
-            for paste in pastebin:
-                pastebin_ids.append(paste.paste_id)
-
+            pastebin_ids = [paste.paste_id for paste in pastebin]
+            new_ids = []
             for paste in result:
 
                 if paste['key'] not in pastebin_ids:
@@ -185,11 +179,13 @@ def check_pastebin(keywords):
                         paste_response = requests.get(paste['scrape_url'], headers)
                         paste_body_lower = paste_response.content.lower()
 
-                        keyword_hits = []
+                        keyword_hits = [
+                            keyword
+                            for keyword in keywords
+                            if bytes(str(keyword).lower(), 'utf8')
+                            in paste_body_lower
+                        ]
 
-                        for keyword in keywords:
-                            if bytes(str(keyword).lower(), 'utf8') in paste_body_lower:
-                                keyword_hits.append(keyword)
 
                         if len(keyword_hits):
                             # We stored the first matched keyword, others are pointless
@@ -197,22 +193,34 @@ def check_pastebin(keywords):
                             paste_content_hits[paste['full_url']] = str(paste_body_lower.decode("utf-8"))
 
                             print(
-                                str(timezone.now()) + " - Hit on Pastebin for ", str(keyword_hits), ": ",
-                                paste['full_url'])
+                                f"{str(timezone.now())} - Hit on Pastebin for ",
+                                keyword_hits,
+                                ": ",
+                                paste['full_url'],
+                            )
+
                     except requests.exceptions.RequestException as e:
-                        print(str(timezone.now()) + " - ", e)
+                        print(f"{str(timezone.now())} - ", e)
 
             # store the newly checked IDs
             for pastebin_id in new_ids:
                 PasteId.objects.create(paste_id=pastebin_id)
 
-            print(str(timezone.now()) + " - Successfully processed ", len(new_ids), " Pastebin posts.")
+            print(
+                f"{str(timezone.now())} - Successfully processed ",
+                len(new_ids),
+                " Pastebin posts.",
+            )
+
         else:
             print(str(
                 timezone.now()) + " - Cannot Pull https://scrape.pastebin.com API. You need a Pastebin Pro Account. "
                                   "Please verify that the software IP is whitelisted: https://pastebin.com/doc_scraping_api")
     else:
-        print(str(timezone.now()) + " - Cannot Pull https://scrape.pastebin.com API. API is in maintenance")
+        print(
+            f"{str(timezone.now())} - Cannot Pull https://scrape.pastebin.com API. API is in maintenance"
+        )
+
 
     return paste_hits
 
@@ -230,7 +238,7 @@ def check_keywords(keywords):
 
         if len(results):
             for result in results:
-                print(str(timezone.now()) + " - Create alert for: ", keyword, "url: ", result)
+                print(f"{str(timezone.now())} - Create alert for: ", keyword, "url: ", result)
                 alert = Alert.objects.create(keyword=Keyword.objects.get(name=keyword), url=result)
                 # limiting the number of specific email per alert
                 if len(results) < 6:
@@ -244,7 +252,7 @@ def check_keywords(keywords):
 
     if len(result.keys()):
         for url, keyword in result.items():
-            print(str(timezone.now()) + " - Create alert for: ", keyword, "url: ", url)
+            print(f"{str(timezone.now())} - Create alert for: ", keyword, "url: ", url)
             alert = Alert.objects.create(keyword=Keyword.objects.get(name=keyword), url=url,
                                          content=paste_content_hits[url])
             send_email(alert)
@@ -256,18 +264,14 @@ def send_email(alert):
 
     :param alert: Alert object.
     """
-    emails_to = list()
-    # Get all subscribers email
-    for subscriber in Subscriber.objects.all():
-        emails_to.append(subscriber.user_rec.email)
-
-    # If there is at least one subscriber
-    if len(emails_to) > 0:
+    if emails_to := [
+        subscriber.user_rec.email for subscriber in Subscriber.objects.all()
+    ]:
         try:
             msg = MIMEMultipart()
             msg['From'] = settings.EMAIL_FROM
             msg['To'] = ','.join(emails_to)
-            msg['Subject'] = str("[ALERT #" + str(alert.pk) + "] Data Leak")
+            msg['Subject'] = str(f"[ALERT #{str(alert.pk)}] Data Leak")
             body = get_template(alert)
             msg.attach(MIMEText(body, 'html', _charset='utf-8'))
             text = msg.as_string()
@@ -277,12 +281,12 @@ def send_email(alert):
 
         except Exception as e:
             # Print any error messages to stdout
-            print(str(timezone.now()) + " - Email Error : ", e)
+            print(f"{str(timezone.now())} - Email Error : ", e)
         finally:
             for email in emails_to:
-                print(str(timezone.now()) + " - Email sent to ", email)
+                print(f"{str(timezone.now())} - Email sent to ", email)
     else:
-        print(str(timezone.now()) + " - No subscriber, no email sent.")
+        print(f"{str(timezone.now())} - No subscriber, no email sent.")
 
 
 def send_group_email(keyword, alerts_number):
@@ -292,18 +296,14 @@ def send_group_email(keyword, alerts_number):
     :param keyword: Matched Keyword.
     :param alerts_number: Number of alerts.
     """
-    emails_to = list()
-    # Get all subscribers email
-    for subscriber in Subscriber.objects.all():
-        emails_to.append(subscriber.user_rec.email)
-
-    # If there is at least one subscriber
-    if len(emails_to) > 0:
+    if emails_to := [
+        subscriber.user_rec.email for subscriber in Subscriber.objects.all()
+    ]:
         try:
             msg = MIMEMultipart()
             msg['From'] = settings.EMAIL_FROM
             msg['To'] = ','.join(emails_to)
-            msg['Subject'] = str("[" + str(alerts_number) + " ALERTS] Data Leak")
+            msg['Subject'] = str(f"[{str(alerts_number)} ALERTS] Data Leak")
             body = get_group_template(keyword, alerts_number)
             msg.attach(MIMEText(body, 'html', _charset='utf-8'))
             text = msg.as_string()
@@ -313,9 +313,9 @@ def send_group_email(keyword, alerts_number):
 
         except Exception as e:
             # Print any error messages to stdout
-            print(str(timezone.now()) + " - Email Error : ", e)
+            print(f"{str(timezone.now())} - Email Error : ", e)
         finally:
             for email in emails_to:
-                print(str(timezone.now()) + " - Email sent to ", email)
+                print(f"{str(timezone.now())} - Email sent to ", email)
     else:
-        print(str(timezone.now()) + " - No subscriber, no email sent.")
+        print(f"{str(timezone.now())} - No subscriber, no email sent.")

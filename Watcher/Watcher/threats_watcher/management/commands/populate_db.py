@@ -23,7 +23,7 @@ class Command(BaseCommand, ABC):
             for row in reader:
                 if not BannedWord.objects.filter(name=row['name']):
                     BannedWord.objects.create(name=row['name'])
-            print(str(timezone.now()) + " - Updated Blocklist.")
+            print(f"{str(timezone.now())} - Updated Blocklist.")
 
         # Init Source DB with common sources from CSV File
         with open('threats_watcher/datas/sources.csv') as csvfile:
@@ -31,7 +31,7 @@ class Command(BaseCommand, ABC):
             for row in reader:
                 if not Source.objects.filter(url=row['source']):
                     Source.objects.create(url=row['source'])
-            print(str(timezone.now()) + " - Updated RSS Sources.")
+            print(f"{str(timezone.now())} - Updated RSS Sources.")
 
         # Init User Groups
         permissions = Permission.objects.all()
@@ -39,17 +39,17 @@ class Command(BaseCommand, ABC):
         full_monitoring_permissions = []
         for perm in permissions:
             if "view" in perm.codename \
-                    and "auth" not in str(perm.content_type) \
-                    and "contenttypes" not in str(perm.content_type) \
-                    and "sessions" not in str(perm.content_type) \
-                    and "knox" not in str(perm.content_type) \
-                    and "admin" not in str(perm.content_type):
+                        and "auth" not in str(perm.content_type) \
+                        and "contenttypes" not in str(perm.content_type) \
+                        and "sessions" not in str(perm.content_type) \
+                        and "knox" not in str(perm.content_type) \
+                        and "admin" not in str(perm.content_type):
                 view_permissions.append(perm)
             if "auth" not in str(perm.content_type) \
-                    and "content type" not in str(perm.content_type) \
-                    and "sessions" not in str(perm.content_type) \
-                    and "knox" not in str(perm.content_type) \
-                    and "admin" not in str(perm.content_type):
+                        and "content type" not in str(perm.content_type) \
+                        and "sessions" not in str(perm.content_type) \
+                        and "knox" not in str(perm.content_type) \
+                        and "admin" not in str(perm.content_type):
                 full_monitoring_permissions.append(perm)
         if not Group.objects.filter(name='Analysts Read Only Group') and not Group.objects.filter(
                 name='Analysts Group'):
@@ -59,7 +59,7 @@ class Command(BaseCommand, ABC):
             analyst_group = Group.objects.create(name='Analysts Group')
             analyst_group.permissions.set(full_monitoring_permissions)
 
-            print(str(timezone.now()) + " - User Groups Created")
+            print(f"{str(timezone.now())} - User Groups Created")
 
     def handle(self, *args, **options):
         self._init_db()
