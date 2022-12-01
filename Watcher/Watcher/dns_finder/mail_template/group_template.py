@@ -134,8 +134,9 @@ def get_group_template(dns_monitored, alerts_number):
         """
     body += str(dns_monitored.domain_name) + """</b> asset: </p> <p style="text-align: left; margin-left: 30px; margin-bottom: 25px;"> Details <a href="
         """
-    body += str(
-        settings.WATCHER_URL + "/#/dns_finder") + """ ">here</a>.</p>
+    body += (
+        str(f"{settings.WATCHER_URL}/#/dns_finder")
+        + """ ">here</a>.</p>
                                     <p style="text-align: justify;">
                                         Best Regards,
                                     </p>
@@ -165,6 +166,8 @@ def get_group_template(dns_monitored, alerts_number):
                                   <td colspan="2" align="center" height="100"> 
                                       <td align="center"><img src="
                                       """
+    )
+
     body += str(
         settings.WATCHER_LOGO) + """ " height="90" width="90"></td>                    
                                   </td>

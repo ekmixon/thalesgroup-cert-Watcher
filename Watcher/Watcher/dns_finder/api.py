@@ -46,11 +46,7 @@ class ExportPermission(permissions.DjangoModelPermissions):
     """
 
     def has_permission(self, request, view):
-        has_permission = False
-        # If User have permission to add website, then user have permission to export it
-        if request.user.has_perm('site_monitoring.add_site'):
-            has_permission = True
-        return has_permission
+        return bool(request.user.has_perm('site_monitoring.add_site'))
 
 
 # Thehive Viewset

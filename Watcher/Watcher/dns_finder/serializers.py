@@ -84,11 +84,11 @@ class MISPSerializer(serializers.Serializer):
         try:
             requests.get(settings.MISP_URL, verify=settings.MISP_VERIFY_SSL)
         except requests.exceptions.SSLError as e:
-            print(str(timezone.now()) + " - ", e)
-            raise AuthenticationFailed("SSL Error: " + settings.MISP_URL)
+            print(f"{str(timezone.now())} - ", e)
+            raise AuthenticationFailed(f"SSL Error: {settings.MISP_URL}")
         except requests.exceptions.RequestException as e:
-            print(str(timezone.now()) + " - ", e)
-            raise NotFound("Not Found: " + settings.MISP_URL)
+            print(f"{str(timezone.now())} - ", e)
+            raise NotFound(f"Not Found: {settings.MISP_URL}")
 
         misp_api = ExpandedPyMISP(settings.MISP_URL, settings.MISP_KEY, settings.MISP_VERIFY_SSL)
 
@@ -103,11 +103,11 @@ class MISPSerializer(serializers.Serializer):
             event.distribution = 0
             event.threat_level_id = 2
             event.analysis = 0
-            event.info = "Suspicious domain name " + site.domain_name
+            event.info = f"Suspicious domain name {site.domain_name}"
             event.tags = create_misp_tags(misp_api)
 
             # Create MISP Event
-            print(str(timezone.now()) + " - " + 'Create MISP Event')
+            print(f"{str(timezone.now())} - Create MISP Event")
             print('-----------------------------')
             event = misp_api.add_event(event, pythonify=True)
 
@@ -161,11 +161,11 @@ class ThehiveSerializer(serializers.Serializer):
         try:
             requests.get(settings.THE_HIVE_URL)
         except requests.exceptions.SSLError as e:
-            print(str(timezone.now()) + " - ", e)
-            raise AuthenticationFailed("SSL Error: " + settings.THE_HIVE_URL)
+            print(f"{str(timezone.now())} - ", e)
+            raise AuthenticationFailed(f"SSL Error: {settings.THE_HIVE_URL}")
         except requests.exceptions.RequestException as e:
-            print(str(timezone.now()) + " - ", e)
-            raise NotFound("Not Found: " + settings.THE_HIVE_URL)
+            print(f"{str(timezone.now())} - ", e)
+            raise NotFound(f"Not Found: {settings.THE_HIVE_URL}")
 
         hive_api = TheHiveApi(settings.THE_HIVE_URL, settings.THE_HIVE_KEY, cert=True)
 
@@ -176,22 +176,30 @@ class ThehiveSerializer(serializers.Serializer):
             # If the case does not exist, then we create it
 
             # Prepare the case
-            case = Case(title='Suspicious domain name ' + site.domain_name,
-                        owner=settings.THE_HIVE_CASE_ASSIGNEE,
-                        severity=2,
-                        tlp=2,
-                        pap=2,
-                        flag=False,
-                        tags=['Watcher', 'Impersonation', 'Malicious Domain', 'Typosquatting'],
-                        description='Suspicious domain name ' + site.domain_name)
+            case = Case(
+                title=f'Suspicious domain name {site.domain_name}',
+                owner=settings.THE_HIVE_CASE_ASSIGNEE,
+                severity=2,
+                tlp=2,
+                pap=2,
+                flag=False,
+                tags=[
+                    'Watcher',
+                    'Impersonation',
+                    'Malicious Domain',
+                    'Typosquatting',
+                ],
+                description=f'Suspicious domain name {site.domain_name}',
+            )
+
 
             # Create the case
-            print(str(timezone.now()) + " - " + 'Create Case')
+            print(f"{str(timezone.now())} - Create Case")
             print('-----------------------------')
             response = hive_api.create_case(case)
 
             if response.status_code == 201:
-                print(str(timezone.now()) + " - " + "OK")
+                print(f"{str(timezone.now())} - OK")
                 case_id = response.json()['id']
 
                 # Save the case id in database
@@ -202,7 +210,11 @@ class ThehiveSerializer(serializers.Serializer):
                 # Create all IOCs observables
                 create_observables(hive_api, case_id, site)
             else:
-                print(str(timezone.now()) + " - " + 'ko: {}/{}'.format(response.status_code, response.text))
+                print(
+                    f"{str(timezone.now())} - "
+                    + f'ko: {response.status_code}/{response.text}'
+                )
+
                 data = {'detail': response.json()['type'] + ": " + response.json()['message']}
                 raise serializers.ValidationError(data)
 

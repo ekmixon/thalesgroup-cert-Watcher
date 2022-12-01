@@ -106,7 +106,7 @@ class LogEntryAdmin(admin.ModelAdmin):
         ct = obj.content_type
         repr_ = escape(obj.object_repr)
         try:
-            href = reverse('admin:%s_%s_change' % (ct.app_label, ct.model), args=[obj.object_id])
+            href = reverse(f'admin:{ct.app_label}_{ct.model}_change', args=[obj.object_id])
             link = mark_safe(u'<a href="%s">%s</a>' % (href, repr_))
         except NoReverseMatch:
             link = repr_

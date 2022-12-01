@@ -109,8 +109,9 @@ def get_template(alert):
                     <td colspan="2" align="center" height="100">       
                         <h1>Data Leak: Alert 
                         """
-    body += "#" + str(
-        alert.pk) + """
+    body += (
+        f"#{str(alert.pk)}"
+        + """
                         </h1>
                      </td>
                 </tr>
@@ -134,14 +135,17 @@ def get_template(alert):
                                     <p style="text-align: justify;">New Data Leakage Alert for 
                                     <b>
         """
+    )
+
     body += str(
         alert.keyword) + """</b> keyword: </p> <p style="text-align: left; margin-left: 30px;"> Source: 
         """
     body += str(
         alert.url) + """ </p> <p style="text-align: left; margin-left: 30px; margin-bottom: 25px;"> Details <a href="
         """
-    body += str(
-        settings.WATCHER_URL + "/#/data_leak") + """ ">here</a>.</p>
+    body += (
+        str(f"{settings.WATCHER_URL}/#/data_leak")
+        + """ ">here</a>.</p>
                                     <p style="text-align: justify;">
                                         Best Regards,
                                     </p>
@@ -171,6 +175,8 @@ def get_template(alert):
                                   <td colspan="2" align="center" height="100"> 
                                       <td align="center"><img src="
                                       """
+    )
+
     body += str(
         settings.WATCHER_LOGO) + """ " height="90" width="90"></td>                    
                                   </td>
